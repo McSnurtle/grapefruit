@@ -145,7 +145,7 @@ class UI(tk.Tk):
                 response = self.cnc.send_gcode(command)
                 if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
                 if response != "ok":
-                    self._log(message=f"Previous command errored with code: {last_response}.")
+                    self._log(message=f"Previous command errored with code: {response}.")
                     messagebox.showerror("Error running G-Code", f"The following error occurred whilst running G-code:\n\n{last_response}\n\nSee the console logs for more details.")
 
     def _get_and_load_gcode(self):
