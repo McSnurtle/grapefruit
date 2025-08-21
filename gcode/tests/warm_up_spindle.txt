@@ -1,0 +1,7 @@
+S600 M03
+G4 P30 (Run at 600 RPM for 30 seconds)
+S1200 M03
+G4 P120 (Run at 1200 RPM for 120 seconds)
+S1800 M03
+G4 P120 (Run at 1800 RPM for 120 seconds)
+M05
