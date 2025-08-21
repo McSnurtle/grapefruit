@@ -7,7 +7,8 @@ from typing import Iterable
 gcode_filetypes: Iterable[tuple[str, str]] = (
     ("Text Files", "*.txt"),
     ("Numerical Control Files", "*.nc"),
-    ("Tape files", "*.TAP")
+    ("G-code Files", "*.gc"), 
+    ("Tape Files", "*.TAP")
 )
 
 
