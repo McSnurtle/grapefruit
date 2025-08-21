@@ -1,7 +1,7 @@
 # imports - ui.py, by Mc_Snurtle
 import os
 import sys
-import time
+import threading
 import tkinter as tk
 from tkinter import (ttk, filedialog, messagebox)
 from typing import (Any, Iterable, Union)
@@ -10,6 +10,7 @@ from utils.path import (get_home, gcode_filetypes)
 from utils.connector import (CNC, get_machines)
 
 # ========== Constants ==========
+RUNNING: bool = True
 WIDTH: int = 800
 HEIGHT: int = 600
 command_interval: int = 1  # in seconds # TODO: move this and it's references across all scripts to the new gcode module as mentioned in issue #1
@@ -144,9 +145,6 @@ class UI(tk.Tk):
             if command is not None:
                 response = self.cnc.send_gcode(command)
                 if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
-                if response != "ok":
-                    self._log(message=f"Previous command errored with code: {response}.")
-                    messagebox.showerror("Error running G-Code", f"The following error occurred whilst running G-code:\n\n{last_response}\n\nSee the console logs for more details.")
 
     def _get_and_load_gcode(self):
         self._load_gcode(self.show_open_file_dialog(), verbose=False)
