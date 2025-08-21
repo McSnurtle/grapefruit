@@ -142,13 +142,14 @@ class UI(tk.Tk):
 
         last_response: str = "ok"
         for command in commands:
-            if command is not None and last_response == "ok":
+            if command is not None and not command.startswith(";"):
                 response = self.cnc.send_gcode(command)
                 last_response = response
                 if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
-            else:
+            if last_response != "ok":
                 self._log(message=f"Previous command errored with code: {last_response}.")
                 # messagebox.showerror("Error running G-Code", f"The following error occurred whilst running G-code:\n\n{last_response}\n\nSee the console logs for more details.")
+		last_response: str = "ok"
 
     def _get_and_load_gcode(self):
         self._load_gcode(self.show_open_file_dialog(), verbose=False)
