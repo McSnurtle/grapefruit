@@ -31,7 +31,7 @@ class UI(tk.Tk):
 
         # vars
         self.serial_port: str = "COM3"  # TODO: make a widget for machine setup accessed through "Machine" menubar cascade.
-        self.baud_rate: int = 9600
+        self.baud_rate: int = 115200
         self.cnc = None
         self.gcode_path: str = ""
         self.status: str = "Welcome to grapefruit! To connect a machine, select Machine > Connect to <your machine>, and load some some G-code from File > Open!"
@@ -127,6 +127,7 @@ class UI(tk.Tk):
         gcode_path = path if isinstance(path, str) else self.gcode_path
         with open(gcode_path, "r") as fp:
             commands: Iterable[str] = fp.readlines()
+        self.show_status(f"Loading G-code from {gcode_path}")
         self.gcode_input.configure(state="normal")
         [self.gcode_input.insert(float(index+1), command) for index, command in enumerate(commands)]
         self.gcode_input.configure(state="disabled")
@@ -148,7 +149,7 @@ class UI(tk.Tk):
                 time.sleep(command_interval)
 
     def _get_and_load_gcode(self):
-        self._load_gcode(self.show_open_file_dialog(), verbose=True)
+        self._load_gcode(self.show_open_file_dialog(), verbose=False)
 
     def show_status(self, message: str) -> None:
         """Updates the status bar at the bottom of the UI with `message`.
