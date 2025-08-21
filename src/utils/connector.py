@@ -24,6 +24,9 @@ class CNC:
 
     def connect(self):
         self.connector = serial.Serial(self.serial_port, self.baud_rate, timeout=timeout)
+        time.sleep(2)   # wait for connection to establish / wait for GRBL nonsense
+        self.connector.flushInput()
+        print(f"[CNC] Conection established with {self.serial_port}")
 
     def send_gcode(self, command: str, verbose: bool = True) -> Any:
         """Streams G-code to connected machine over the serial port. Returns the machine's response.
