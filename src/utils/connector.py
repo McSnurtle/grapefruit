@@ -42,7 +42,7 @@ class CNC:
 
         time.sleep(command_interval)
 
-        response: Any = self.connector.readline()  # This requires the connected machine to terminate ALL responses with an EOL!
+        response: Any = self.connector.readline().decode("utf-8").strip()  # This requires the connected machine to terminate ALL responses with an EOL!
 
         if verbose: print(f"[CNC] {response}")
         return response
