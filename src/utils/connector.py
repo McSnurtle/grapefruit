@@ -4,6 +4,7 @@ import time
 from typing import Any, Union
 
 import serial
+from serial.tools import list_ports
 
 # ========== Variables ==========
 command_interval: int = 1  # in seconds
@@ -18,6 +19,9 @@ class CNC:
     def __init__(self, serial_port: str, baud_rate: int):
         self.serial_port: str = serial_port
         self.baud_rate: int = baud_rate
+        self.connector = None
+
+    def connect(self):
         self.connector = serial.Serial(self.serial_port, self.baud_rate)
 
     def send_gcode(self, command: str) -> Any:
@@ -63,3 +67,19 @@ class CNC:
             :returns: (Any), the machines response from running the rapid movement."""
 
         return self.send_gcode(f"G1 E{extrude} X{x} Y{y} Z{z}")
+
+
+# ========== Functions ==========
+def get_machines() -> list[dict[str, str]]:
+    """Returns a list of all COM ports through PySerial.
+
+    Returns:
+        :returns: (list[dict[str, str]]), for example, the return might look like: `[{"port": "COM1", "desc": "A thingy.", "hwid": "ACPI\\PNP0501\\1"}]`."""
+    ports = list_ports.comports()
+    results: list[dict[str, str]] = []
+
+    for port, desc, hwid in sorted(ports):
+        if desc != "n/a":   # filter to only known ports
+            results.append({"port": port, "desc": desc, "hwid": hwid})
+
+    return results
