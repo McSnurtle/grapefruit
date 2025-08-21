@@ -3,12 +3,11 @@ import os
 import sys
 import time
 import tkinter as tk
-from tkinter import ttk
-from tkinter import filedialog
-from typing import Iterable, Union
+from tkinter import (ttk, filedialog, messagebox)
+from typing import (Iterable, Union)
 
-from utils.path import get_home, gcode_filetypes
-from utils.connector import CNC
+from utils.path import (get_home, gcode_filetypes)
+from utils.connector import (CNC, get_machines)
 
 # ========== Constants ==========
 WIDTH: int = 800
@@ -33,9 +32,12 @@ class UI(tk.Tk):
         # vars
         self.serial_port: str = "COM3"  # TODO: make a widget for machine setup accessed through "Machine" menubar cascade.
         self.baud_rate: int = 9600
-        # self.cnc = CNC(serial_port=self.serial_port, baud_rate=self.baud_rate)    # NOT IMPLEMENTED
+        self.cnc = None
         self.gcode_path: str = ""
-        self.status: str = "Welcome to grapefruit!"
+        self.status: str = "Welcome to grapefruit! To connect a machine, select Machine > Connect to <your machine>, and load some some G-code from File > Open!"
+
+        if not len(get_machines()) > 0:
+            messagebox.showwarning("No Machines Found!", "No valid CNC machines were found over COM ports. Please ensure it is on and plugged in properly.")
 
         # layout
         self._construct_menus()
@@ -91,7 +93,17 @@ class UI(tk.Tk):
         file_menu.add_separator()
         file_menu.add_command(label="Exit Program", command=self.terminate)
 
+        machine_menu = tk.Menu(menubar, tearoff=False)
+        menubar.add_cascade(label="Machine", menu=machine_menu)
+        for machine in get_machines():
+            machine_menu.add_command(label=f"Connect to {machine["desc"]} ({machine["port"]}", command=lambda: self._connect_to_machine(machine["port"]))
+
         self.configure(menu=menubar)
+
+    def _connect_to_machine(self, serial_port: str) -> None:
+        self.serial_port = serial_port
+        self.cnc = CNC(serial_port=self.serial_port, baud_rate=self.baud_rate)
+        self.cnc.connect()
 
     def _run_mdi(self, verbose: bool = True) -> None:
         commands = self.mdi_input.get(1.0, tk.END).split("\n")  # split on newlines
