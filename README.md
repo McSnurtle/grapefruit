@@ -1,2 +1,2 @@
-# grapefruit :orange::gear:
+# grapefruit :gear:
 A software CNC controller for sending G-code through Python and serial ports.
