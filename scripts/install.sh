@@ -1,4 +1,4 @@
-#!/bin/bash/
+#!/bin/bash
 
 echo "Running installation for https://github.com/McSnurtle/gbro.git"
 
