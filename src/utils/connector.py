@@ -7,7 +7,7 @@ import serial
 from serial.tools import list_ports
 
 # ========== Variables ==========
-command_interval: int = 0.25  # in seconds
+command_interval: Union[int, float] = 0.25  # in seconds
 timeout: int = 1    # also in seconds
 # feed rates
 rapid_rate: int = 100
