@@ -4,13 +4,12 @@ import sys
 import threading
 import tkinter as tk
 from tkinter import (ttk, filedialog, messagebox)
-from typing import (Any, Iterable, Union)
+from typing import (Iterable, Union)
 
 from utils.path import (get_home, gcode_filetypes)
 from utils.connector import (CNC, get_machines)
 
 # ========== Constants ==========
-RUNNING: bool = True
 WIDTH: int = 800
 HEIGHT: int = 600
 command_interval: int = 1  # in seconds # TODO: move this and it's references across all scripts to the new gcode module as mentioned in issue #1
@@ -31,7 +30,8 @@ class UI(tk.Tk):
         self.geometry(f"{WIDTH}x{HEIGHT}")
 
         # vars
-        self.threads: list[threading.Thread] = []
+        self.job_running: bool = False
+        self.jobs: list[threading.Thread] = []
         self.serial_port: str = ""
         self.baud_rate: int = 115200    # 115200 is for GRBL / lazers
         self.cnc = None
@@ -60,7 +60,7 @@ class UI(tk.Tk):
         mdi_controls = tk.Frame(mdi_frame)
         run_mdi = tk.Button(mdi_controls, text="Run MDI", bg="#00FF00", command=self._run_mdi)
         run_mdi.pack(side="left", padx=5, pady=5)
-        stop_mdi = tk.Button(mdi_controls, text="Stop MDI", bg="#FF0000")
+        stop_mdi = tk.Button(mdi_controls, text="Stop MDI", bg="#FF0000", command=self._stop_jobs)
         stop_mdi.pack(side="left", padx=5, pady=5)
         mdi_controls.pack(side="bottom", fill="x", expand=True)
         self.mdi_input = tk.Text(mdi_frame)
@@ -76,6 +76,8 @@ class UI(tk.Tk):
         gcode_controls = tk.Frame(gcode_frame)
         run_gcode = tk.Button(gcode_controls, text="Run G-code", bg="#00FF00", command=self._run_gcode)
         run_gcode.pack(side="left", padx=5, pady=5)
+        stop_gcode = tk.Button(gcode_controls, text="Stop G-code", bg="#FF0000", command=self._stop_jobs)
+        stop_gcode.pack(side="left", padx=5, pady=5)
         gcode_controls.pack(side="bottom", fill="x", expand=True)
         self.gcode_input = tk.Text(gcode_frame, state="disabled")
         gcode_scrollbar = tk.Scrollbar(gcode_frame, command=self.gcode_input.yview)
@@ -117,6 +119,14 @@ class UI(tk.Tk):
 
         self._stream_gcode(commands, verbose=verbose)
 
+    def _stop_jobs(self) -> None:
+        """Stops running gcode on the machine."""
+
+        self.cnc.send_gcode("M02")
+        self.job_running = False
+        self.cnc.send_gcode("M02")
+        [job.join() for job in self.jobs]
+
     def _load_gcode(self, path: Union[str, None] = None, verbose: bool = False) -> Iterable[str]:
         """Loads G-code based on the given absolute filepath.
 
@@ -142,10 +152,17 @@ class UI(tk.Tk):
     def _stream_gcode(self, commands: Iterable[str], verbose: bool = True) -> None:
         """Initiates a connection with the CNC's serial port and sends the provided G-code commands in sequence."""
 
-        for command in commands:
-            if command is not None:
-                response = self.cnc.send_gcode(command)
-                if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
+        self.job_running = True
+
+        def stream():
+            for command in commands:
+                if command is not None and self.job_running:
+                    response = self.cnc.send_gcode(command)
+                    if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
+
+        stream_thread: threading.Thread = threading.Thread(target=stream)
+        self.jobs.append(stream_thread)
+        stream_thread.start()
 
     def _get_and_load_gcode(self):
         self._load_gcode(self.show_open_file_dialog(), verbose=False)
@@ -182,11 +199,9 @@ class UI(tk.Tk):
         Params:
             :param exit_code: (int), the code to exit the program with. Defaults to 0 (lived happily ever after)."""
 
-        global RUNNING
-
-        RUNNING = False
+        self.job_running = False
         self.show_status("Closing...")
-        [thread.join() for thread in self.threads]
+        self._stop_jobs()
         self.cnc.terminate()
         self.destroy()
         sys.exit(exit_code)
