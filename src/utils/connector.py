@@ -25,6 +25,14 @@ class CNC:
     def connect(self):
         self.connector = serial.Serial(self.serial_port, self.baud_rate, timeout=timeout)
         time.sleep(2)   # wait for connection to establish / wait for GRBL nonsense
+
+        if self.connector.in_waiting:
+            startup_msg = self.connector.read(self.connector.in_waiting).decode("utf-8", errors="replace").strip()
+            print(f"[CNC] Startup message from GRBL:\n{startup_msg}")
+        else:
+            print("[CNC] No data received from GRBL on connect.")
+
+
         self.connector.flushInput()
         self.handshake()
         print(f"[CNC] Conection established with {self.serial_port}")
