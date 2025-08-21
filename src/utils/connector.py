@@ -33,7 +33,7 @@ class CNC:
             print("[CNC] No data received from GRBL on connect.")
 
 
-        self.connector.flushInput()
+        self.connector.flush()
         self.handshake()
         print(f"[CNC] Conection established with {self.serial_port}")
 
