@@ -144,7 +144,7 @@ class UI(tk.Tk):
                 # NOT IMPLEMENTED YET
                 pass
                 response = self.cnc.send_gcode(command)
-                if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); # print(f"[Grapefruit] Got response: `{response}`.")
+                if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
                 time.sleep(command_interval)
 
     def _get_and_load_gcode(self):
