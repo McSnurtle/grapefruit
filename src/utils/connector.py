@@ -88,6 +88,11 @@ class CNC:
 
         return self.send_gcode(f"G1 E{extrude} X{x} Y{y} Z{z}")
 
+    def terminate(self) -> None:
+        """Safely terminate connection"""
+        self.send_gcode("M02")  # send "completely terminate job" command
+        self.connector.close()  # don't rely on garbage collection to __del__()
+
 
 # ========== Functions ==========
 def get_machines() -> list[dict[str, str]]:

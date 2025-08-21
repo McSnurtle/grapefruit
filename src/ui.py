@@ -31,6 +31,7 @@ class UI(tk.Tk):
         self.geometry(f"{WIDTH}x{HEIGHT}")
 
         # vars
+        self.threads: list[threading.Thread] = []
         self.serial_port: str = ""
         self.baud_rate: int = 115200    # 115200 is for GRBL / lazers
         self.cnc = None
@@ -181,8 +182,12 @@ class UI(tk.Tk):
         Params:
             :param exit_code: (int), the code to exit the program with. Defaults to 0 (lived happily ever after)."""
 
+        global RUNNING
+
+        RUNNING = False
         self.show_status("Closing...")
-        # TO DO: safely disconnect from serial stream and tell machine to stop whatever it's doing. We can't just have the bit spinning forever!
+        [thread.join() for thread in self.threads]
+        self.cnc.terminate()
         self.destroy()
         sys.exit(exit_code)
 
