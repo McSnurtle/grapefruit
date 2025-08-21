@@ -140,7 +140,7 @@ class UI(tk.Tk):
     def _stream_gcode(self, commands: Iterable[str], verbose: bool = True) -> None:
         """Initiates a connection with the CNC's serial port and sends the provided G-code commands in sequence."""
 
-        last_response: Any = None
+        last_response: str = "ok"
         for command in commands:
             if command is not None and last_response == "ok":
                 response = self.cnc.send_gcode(command)
@@ -148,7 +148,7 @@ class UI(tk.Tk):
                 if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
             else:
                 self._log(message=f"Previous command errored with code: {last_response}.")
-                messagebox.showerror("Error running G-Code", f"The following error occurred whilst running G-code:\n\n{last_response}\n\nSee the console logs for more details.")
+                # messagebox.showerror("Error running G-Code", f"The following error occurred whilst running G-code:\n\n{last_response}\n\nSee the console logs for more details.")
 
     def _get_and_load_gcode(self):
         self._load_gcode(self.show_open_file_dialog(), verbose=False)
