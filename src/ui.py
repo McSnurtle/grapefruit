@@ -4,7 +4,7 @@ import sys
 import time
 import tkinter as tk
 from tkinter import (ttk, filedialog, messagebox)
-from typing import (Iterable, Union)
+from typing import (Any, Iterable, Union)
 
 from utils.path import (get_home, gcode_filetypes)
 from utils.connector import (CNC, get_machines)
@@ -30,8 +30,8 @@ class UI(tk.Tk):
         self.geometry(f"{WIDTH}x{HEIGHT}")
 
         # vars
-        self.serial_port: str = "COM3"  # TODO: make a widget for machine setup accessed through "Machine" menubar cascade.
-        self.baud_rate: int = 115200
+        self.serial_port: str = ""
+        self.baud_rate: int = 115200    # 115200 is for GRBL / lazers
         self.cnc = None
         self.gcode_path: str = ""
         self.status: str = "Welcome to grapefruit! To connect a machine, select Machine > Connect to <your machine>, and load some some G-code from File > Open!"
@@ -140,14 +140,25 @@ class UI(tk.Tk):
     def _stream_gcode(self, commands: Iterable[str], verbose: bool = True) -> None:
         """Initiates a connection with the CNC's serial port and sends the provided G-code commands in sequence."""
 
+        last_response: Any = None
         for command in commands:
-            if command:
+            if command is not None and last_response == "ok":
                 response = self.cnc.send_gcode(command)
+                last_response = response
                 if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
-                time.sleep(command_interval)
+            else:
+                self._log(message=f"Previous command errored with code: {last_response}.")
+                messagebox.showerror("Error running G-Code", f"The following error occurred whilst running G-code:\n\n{last_response}\n\nSee the console logs for more details.")
 
     def _get_and_load_gcode(self):
         self._load_gcode(self.show_open_file_dialog(), verbose=False)
+
+    def _log(self, prefix: str = "Grapefruit", message: str = "", stdout: bool = True) -> None:
+        # TODO: make this log to a widget on the UI somewhere.
+        output: str = f"[{prefix}] {message}"
+        self.show_status(output)
+        if stdout:
+            print(output)
 
     def show_status(self, message: str) -> None:
         """Updates the status bar at the bottom of the UI with `message`.
