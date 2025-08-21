@@ -8,6 +8,7 @@ from serial.tools import list_ports
 
 # ========== Variables ==========
 command_interval: int = 1  # in seconds
+timeout: int = 1    # also in seconds
 # feed rates
 rapid_rate: int = 100
 jog_rate: int = 25
@@ -22,7 +23,7 @@ class CNC:
         self.connector = None
 
     def connect(self):
-        self.connector = serial.Serial(self.serial_port, self.baud_rate)
+        self.connector = serial.Serial(self.serial_port, self.baud_rate, timeout=timeout)
 
     def send_gcode(self, command: str, verbose: bool = True) -> Any:
         """Streams G-code to connected machine over the serial port. Returns the machine's response.
@@ -34,7 +35,7 @@ class CNC:
         Returns:
             :returns: (Any), the response given from the machine after `command` was run."""
 
-        self.connector.write(command.encode("utf-8"))
+        self.connector.write((command.strip() + "\r\n").encode("utf-8"))
 
         time.sleep(command_interval)
 
