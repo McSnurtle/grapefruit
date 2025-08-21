@@ -1,15 +1,19 @@
 # imports - ui.py, by Mc_Snurtle
 import os
 import sys
+import time
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog
 from typing import Iterable, Union
 
 from utils.path import get_home, gcode_filetypes
+from utils.connector import CNC
 
 # ========== Constants ==========
 WIDTH: int = 800
 HEIGHT: int = 600
+command_interval: int = 1  # in seconds # TODO: move this and it's references across all scripts to the new gcode module as mentioned in issue #1
 
 # ========== Variables ==========
 __author__: str = "Mc_Snurtle"
@@ -27,6 +31,9 @@ class UI(tk.Tk):
         self.geometry(f"{WIDTH}x{HEIGHT}")
 
         # vars
+        self.serial_port: str = "COM3"  # TODO: make a widget for machine setup accessed through "Machine" menubar cascade.
+        self.baud_rate: int = 9600
+        # self.cnc = CNC(serial_port=self.serial_port, baud_rate=self.baud_rate)    # NOT IMPLEMENTED
         self.gcode_path: str = ""
         self.status: str = "Welcome to grapefruit!"
 
@@ -38,6 +45,41 @@ class UI(tk.Tk):
         self.status_bar.pack(side="left", fill="x", expand=True, padx=1,
                              pady=1)  # couldn't supress PyCharm warnings about Literals
         status_frame.pack(side="bottom", anchor="sw", fill="x")
+
+        # TODO: move the following gcode section to it's own self._construct_gcode() method. It's cluttering up __init__()!
+
+        gcode_tabs = ttk.Notebook(self, width=WIDTH//2, height=HEIGHT//3)
+
+        mdi_frame: tk.Frame = tk.Frame(gcode_tabs)
+        gcode_tabs.add(mdi_frame, text="MDI")
+
+        mdi_controls = tk.Frame(mdi_frame)
+        run_mdi = tk.Button(mdi_controls, text="Run MDI", bg="#00FF00", command=self._run_mdi)
+        run_mdi.pack(side="left", padx=5, pady=5)
+        stop_mdi = tk.Button(mdi_controls, text="Stop MDI", bg="#FF0000")
+        stop_mdi.pack(side="left", padx=5, pady=5)
+        mdi_controls.pack(side="bottom", fill="x", expand=True)
+        self.mdi_input = tk.Text(mdi_frame)
+        mdi_scrollbar = tk.Scrollbar(mdi_frame, command=self.mdi_input.yview)
+        mdi_scrollbar.pack(side="right", fill="y", expand=True)
+        self.mdi_input["yscrollcommand"] = mdi_scrollbar.set  # widget.yscrollcommand is a PyRight error apparently
+        self.mdi_input.pack(fill="both", expand=True)
+
+
+        gcode_frame: tk.Frame = tk.Frame(gcode_tabs)
+        gcode_tabs.add(gcode_frame, text="G-code")
+
+        gcode_controls = tk.Frame(gcode_frame)
+        run_gcode = tk.Button(gcode_controls, text="Run G-code", bg="#00FF00", command=self._run_gcode)
+        run_gcode.pack(side="left", padx=5, pady=5)
+        gcode_controls.pack(side="bottom", fill="x", expand=True)
+        self.gcode_input = tk.Text(gcode_frame, state="disabled")
+        gcode_scrollbar = tk.Scrollbar(gcode_frame, command=self.gcode_input.yview)
+        gcode_scrollbar.pack(side="right", fill="y", expand=True)
+        self.gcode_input["yscrollcommand"] = gcode_scrollbar.set
+        self.gcode_input.pack(fill="both", expand=True)
+
+        gcode_tabs.pack(side="left")
 
     def _construct_menus(self):
         """Instantiate the menus"""
@@ -51,6 +93,16 @@ class UI(tk.Tk):
 
         self.configure(menu=menubar)
 
+    def _run_mdi(self, verbose: bool = True) -> None:
+        commands = self.mdi_input.get(1.0, tk.END).split("\n")  # split on newlines
+
+        self._stream_gcode(commands, verbose=verbose)
+
+    def _run_gcode(self, verbose: bool = True) -> None:
+        commands = self.gcode_input.get(1.0, tk.END).split("\n")
+
+        self._stream_gcode(commands, verbose=verbose)
+
     def _load_gcode(self, path: Union[str, None] = None, verbose: bool = False) -> Iterable[str]:
         """Loads G-code based on the given absolute filepath.
 
@@ -63,10 +115,25 @@ class UI(tk.Tk):
         gcode_path = path if isinstance(path, str) else self.gcode_path
         with open(gcode_path, "r") as fp:
             commands: Iterable[str] = fp.readlines()
+        self.gcode_input.configure(state="normal")
+        [self.gcode_input.insert(float(index+1), command) for index, command in enumerate(commands)]
+        self.gcode_input.configure(state="disabled")
 
-        if verbose: print("".join(commands))    # don't add \n since .readlines() already parses that out from text documents.
+        if verbose: print(
+            "".join(commands))  # don't add \n since .readlines() already parses that out from text documents.
 
         return commands
+
+    def _stream_gcode(self, commands: Iterable[str], verbose: bool = True) -> None:
+        """Initiates a connection with the CNC's serial port and sends the provided G-code commands in sequence."""
+
+        for command in commands:
+            if command:
+                # NOT IMPLEMENTED YET
+                pass
+                # response = self.cnc.send_gcode(command)
+                if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); # print(f"[Grapefruit] Got response: `{response}`.")
+                time.sleep(command_interval)
 
     def _get_and_load_gcode(self):
         self._load_gcode(self.show_open_file_dialog(), verbose=True)
