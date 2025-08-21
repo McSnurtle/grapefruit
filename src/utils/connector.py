@@ -35,7 +35,7 @@ class CNC:
 
         self.connector.flush()
         self.handshake()
-        print(f"[CNC] Conection established with {self.serial_port}")
+        print(f"[CNC] Connection established with {self.serial_port}")
 
     def handshake(self):
         self.send_gcode("$$")
