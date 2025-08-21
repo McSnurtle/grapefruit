@@ -149,7 +149,7 @@ class UI(tk.Tk):
             if last_response != "ok":
                 self._log(message=f"Previous command errored with code: {last_response}.")
                 # messagebox.showerror("Error running G-Code", f"The following error occurred whilst running G-code:\n\n{last_response}\n\nSee the console logs for more details.")
-		last_response: str = "ok"
+                last_response: str = "ok"
 
     def _get_and_load_gcode(self):
         self._load_gcode(self.show_open_file_dialog(), verbose=False)
