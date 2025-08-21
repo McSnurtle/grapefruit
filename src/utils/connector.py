@@ -24,12 +24,13 @@ class CNC:
     def connect(self):
         self.connector = serial.Serial(self.serial_port, self.baud_rate)
 
-    def send_gcode(self, command: str) -> Any:
+    def send_gcode(self, command: str, verbose: bool = True) -> Any:
         """Streams G-code to connected machine over the serial port. Returns the machine's response.
         WARNING: This function is blocking, and may take time to receive a response from the machine.
 
         Params:
             :param command: (str), the G-code command to send.
+            :param verbose: (bool), whether to print the CNC's response.
         Returns:
             :returns: (Any), the response given from the machine after `command` was run."""
 
@@ -37,7 +38,10 @@ class CNC:
 
         time.sleep(command_interval)
 
-        return self.connector.readline()  # This requires the connected machine to terminate ALL responses with an EOL!
+        response: Any = self.connector.readline()  # This requires the connected machine to terminate ALL responses with an EOL!
+
+        if verbose: print(f"[CNC] {response}")
+        return response
 
     def move_to(self, extrude: Union[int, float], feed_rate: Union[int, float], x: Union[int, float] = 0, y: Union[int, float] = 0, z: Union[int, float] = 0) -> Any:
         """Sends the connected CNC machine to move to coordinates relative to it's job's datum.
