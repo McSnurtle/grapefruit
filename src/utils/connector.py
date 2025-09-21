@@ -65,18 +65,24 @@ class CNC:
             :rtype: Union[str, None]"""
 
         command = self._parse_command(command)
-        if command is not None:
-            self.connector.write((command.strip() + "\r\n").encode("utf-8"))
 
-            time.sleep(command_interval)
+        try:
+            if command is not None and command != "":
+                if verbose: print(f"[CNC] Sending G-code: `{command}`.")
+                self.connector.write((command.strip() + "\r\n").encode("utf-8"))
 
-            response: Any = self.connector.readline().decode("utf-8").strip()  # This requires the connected machine to terminate ALL responses with an EOL!
+                time.sleep(command_interval)
 
-            if verbose: print(f"[CNC] {response}")
-            return response
-        else:
-            if verbose: print(f"[CNC] Skipping command '{command}'")
-            return None
+                response: Any = self.connector.readline().decode("utf-8").strip()  # This requires the connected machine to terminate ALL responses with an EOL!
+
+                if verbose: print(f"[CNC] Got response: `{response}`")
+                return response
+            else:
+                if verbose: print(f"[CNC] Skipping command '{command}'")
+        except serial.SerialException as e:
+            print(f"[CNC] An unexpected error occured whilst sending G-code to CNC '{self.serial_port}'. See traceback for more. ({e})")
+
+        return None
 
     def _parse_command(self, command: str) -> Union[str, None]:
         """Strips the given command of all comments, and returns only the valid G-code (if any).
@@ -93,10 +99,10 @@ class CNC:
                 command.startswith(":")
                 or command.startswith("/")
                 or command.startswith("(")
-                ):
-            for comment in [":", "/", "("]:
+                ) and command != "":    # if not a comment only, and not empty space
+            for comment in [":", "/", "("]: # for all possible comments...
                 if comment in command:
-                    comment = comment.split(comment, 1)[0]
+                    comment = comment.split(comment, 1)[0]  # remove the comment part of the command
             return command
 
         return None
