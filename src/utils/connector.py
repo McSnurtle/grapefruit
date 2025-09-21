@@ -138,8 +138,9 @@ class CNC:
 
     def terminate(self) -> None:
         """Safely terminate connection"""
-        self.send_gcode("M02")  # send "completely terminate job" command
-        self.connector.close()  # don't rely on garbage collection to __del__()
+        if self.connector is not None:
+            self.send_gcode("M02")  # send "completely terminate job" command
+            self.connector.close()  # don't rely on garbage collection to __del__()
 
 
 # ========== Functions ==========
