@@ -1,5 +1,7 @@
 # Project-specific files
-gcode/usr/
+gcode/usr/*.nc
+gcode/usr/*.txt
+gcode/usr/*.gc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
