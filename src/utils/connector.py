@@ -65,7 +65,7 @@ class CNC:
             :rtype: Union[str, None]"""
 
         command = self._parse_command(command)
-        if command:
+        if command is not None:
             self.connector.write((command.strip() + "\r\n").encode("utf-8"))
 
             time.sleep(command_interval)
@@ -97,6 +97,7 @@ class CNC:
             for comment in [":", "/", "("]:
                 if comment in command:
                     comment = comment.split(comment, 1)[0]
+            return command
 
         return None
 
