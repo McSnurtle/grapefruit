@@ -6,6 +6,8 @@ import tkinter as tk
 from tkinter import (ttk, filedialog, messagebox)
 from typing import (Iterable, Union)
 
+import serial
+
 from utils.path import (get_home, gcode_filetypes)
 from utils.connector import (CNC, get_machines)
 
@@ -128,10 +130,10 @@ class UI(tk.Tk):
     def _stop_jobs(self) -> None:
         """Stops running gcode on the machine."""
 
-        self.cnc.send_gcode("M02")
-        self.job_running = False
-        self.cnc.send_gcode("M02")
-        [job.join() for job in self.jobs]
+        if self.job_running and self.cnc.connector is not None:
+            self.cnc.send_gcode("M02")
+            self.job_running = False
+            [job.join() for job in self.jobs]
 
     def _load_gcode(self, path: Union[str, None] = None, verbose: bool = False) -> Iterable[str]:
         """Loads G-code based on the given absolute filepath.
