@@ -7,7 +7,7 @@ import serial
 from serial.tools import list_ports
 
 # ========== Variables ==========
-command_interval: Union[int, float] = 0.0  # in seconds
+command_interval: Union[int, float] = 0.05  # in seconds
 timeout: int = 1    # also in seconds
 # feed rates
 rapid_rate: int = 100
@@ -33,15 +33,28 @@ class CNC:
             self.connector = serial.Serial(self.serial_port, self.baud_rate, timeout=timeout)
             time.sleep(2)   # wait for connection to establish / wait for GRBL nonsense
 
-            if self.connector.in_waiting:
-                startup_msg = self.connector.read(self.connector.in_waiting).decode("utf-8", errors="replace").strip()
-                print(f"[CNC] Startup message from GRBL:\n{startup_msg}")
-            else:
-                print("[CNC] No data received from GRBL on connect.")
+            startup_data = ""
+            
+            # Read all available lines sent by device on connect
+            while True:
+                if self.connector.in_waiting:
+                    line = self.connector.readline().decode("utf-8", errors="replace").strip()
+                    if line:
+                        print(f"[CNC] Startup message line: '{line}'")
+                        startup_data += line + "\n"
+                    else:
+                        # Empty line, just continue reading
+                        continue
+                else:
+                    # No more data waiting to read, break loop
+                    break
+            
+            print(f"[CNC] Full startup message from device:\n{startup_data.strip()}")
 
 
-            self.connector.flush()
+            self.connector.flush()  # wait for all communications to finish
             self.handshake()
+            self.connector.flush()  # wait for all communications to finish
             print(f"[CNC] Connection established with {self.serial_port}")
         except serial.SerialException as e:
             print(f"[CNC] There was an error whilst attempting first-time connection to the CNC '{self.serial_port}'. ({e})")
@@ -50,9 +63,9 @@ class CNC:
         return True
 
     def handshake(self):
-        self.send_gcode("$$")
+        self.send_gcode("M105")
 
-    def send_gcode(self, command: str, verbose: bool = True) -> Any:
+    def send_gcode(self, command: str, verbose: bool = True, run_anyway: bool = False) -> Any:
         """Streams G-code to connected machine over the serial port. Returns the machine's response.
         WARNING: This function is blocking, and may take time to receive a response from the machine.
 
@@ -60,14 +73,17 @@ class CNC:
             :param command: the G-code command to send.
             :type command: str
             :param verbose: (bool), whether to print the CNC's response.
+            :type verbose: bool
+            :param run_anyway: whether to ignore parsing & sanitization and run as raw G-code, otherwise, comments and blank lines are removed.
+            :type run_anyway: bool
         Returns:
             :returns: the response given from the machine after `command` was run. String if command was sent, and Nonetype if the command was invalid (is comment, etc).
             :rtype: Union[str, None]"""
 
-        command = self._parse_command(command)
+        if not run_anyway: command = self._parse_command(command)
 
         try:
-            if command is not None and command != "":
+            if (command is not None and command != "") or run_anyway:
                 if verbose: print(f"[CNC] Sending G-code: `{command}`.")
                 self.connector.write((command.strip() + "\r\n").encode("utf-8"))
 
