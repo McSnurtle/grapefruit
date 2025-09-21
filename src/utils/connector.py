@@ -22,20 +22,32 @@ class CNC:
         self.baud_rate: int = baud_rate
         self.connector = None
 
-    def connect(self):
-        self.connector = serial.Serial(self.serial_port, self.baud_rate, timeout=timeout)
-        time.sleep(2)   # wait for connection to establish / wait for GRBL nonsense
+    def connect(self) -> bool:
+        """Performs the initial connection to the CNC over serial, returning its success.
 
-        if self.connector.in_waiting:
-            startup_msg = self.connector.read(self.connector.in_waiting).decode("utf-8", errors="replace").strip()
-            print(f"[CNC] Startup message from GRBL:\n{startup_msg}")
-        else:
-            print("[CNC] No data received from GRBL on connect.")
+        Returns:
+            :returns: (bool), whether a connection was successfully established with the CNC.
+        Raises:
+            :raises serial.SerialException: if there was a Permission Error whilst connecting to the CNC."""
+        try:
+            self.connector = serial.Serial(self.serial_port, self.baud_rate, timeout=timeout)
+            time.sleep(2)   # wait for connection to establish / wait for GRBL nonsense
+
+            if self.connector.in_waiting:
+                startup_msg = self.connector.read(self.connector.in_waiting).decode("utf-8", errors="replace").strip()
+                print(f"[CNC] Startup message from GRBL:\n{startup_msg}")
+            else:
+                print("[CNC] No data received from GRBL on connect.")
 
 
-        self.connector.flush()
-        self.handshake()
-        print(f"[CNC] Connection established with {self.serial_port}")
+            self.connector.flush()
+            self.handshake()
+            print(f"[CNC] Connection established with {self.serial_port}")
+        except serial.SerialException as e:
+            print(f"[CNC] There was an error whilst attempting first-time connection to the CNC '{self.serial_port}'. ({e})")
+            raise serial.SerialException(e)
+            return False
+        return True
 
     def handshake(self):
         self.send_gcode("$$")
@@ -45,19 +57,48 @@ class CNC:
         WARNING: This function is blocking, and may take time to receive a response from the machine.
 
         Params:
-            :param command: (str), the G-code command to send.
+            :param command: the G-code command to send.
+            :type command: str
             :param verbose: (bool), whether to print the CNC's response.
         Returns:
-            :returns: (Any), the response given from the machine after `command` was run."""
+            :returns: the response given from the machine after `command` was run. String if command was sent, and Nonetype if the command was invalid (is comment, etc).
+            :rtype: Union[str, None]"""
 
-        self.connector.write((command.strip() + "\r\n").encode("utf-8"))
+        command = self._parse_command(command)
+        if command:
+            self.connector.write((command.strip() + "\r\n").encode("utf-8"))
 
-        time.sleep(command_interval)
+            time.sleep(command_interval)
 
-        response: Any = self.connector.readline().decode("utf-8").strip()  # This requires the connected machine to terminate ALL responses with an EOL!
+            response: Any = self.connector.readline().decode("utf-8").strip()  # This requires the connected machine to terminate ALL responses with an EOL!
 
-        if verbose: print(f"[CNC] {response}")
-        return response
+            if verbose: print(f"[CNC] {response}")
+            return response
+        else:
+            if verbose: print(f"[CNC] Skipping command '{command}'")
+            return None
+
+    def _parse_command(self, command: str) -> Union[str, None]:
+        """Strips the given command of all comments, and returns only the valid G-code (if any).
+
+        Params:
+            :param command: the G-code command provided to be parsed.
+            :type command: str
+        Returns:
+            :returns: parsed command, if is entirely comment, returns None.
+            :rtype: Union[str, None]"""
+
+        command = command.strip()
+        if not (
+                command.startswith(":")
+                or command.startswith("/")
+                or command.startswith("(")
+                ):
+            for comment in [":", "/", "("]:
+                if comment in command:
+                    comment = comment.split(comment, 1)[0]
+
+        return None
 
     def move_to(self, extrude: Union[int, float], feed_rate: Union[int, float], x: Union[int, float] = 0, y: Union[int, float] = 0, z: Union[int, float] = 0) -> Any:
         """Sends the connected CNC machine to move to coordinates relative to it's job's datum.
