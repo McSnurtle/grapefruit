@@ -107,7 +107,13 @@ class UI(tk.Tk):
     def _connect_to_machine(self, serial_port: str) -> None:
         self.serial_port = serial_port
         self.cnc = CNC(serial_port=self.serial_port, baud_rate=self.baud_rate)
-        self.cnc.connect()
+        try:
+            self.cnc.connect()
+        except serial.SerialException as e:
+            messagebox.showwarning("Error Connecting to Machine!",
+                                  f"There was an error while initiating the connection to your machine '{self.serial_port}'.\n" \
+                                  "This is likely due to a conflicting permissions error - are you sure you don't have any other CNC software running?\n" \
+                                  "Error stack trace:\n\n{e}")
 
     def _run_mdi(self, verbose: bool = True) -> None:
         commands = self.mdi_input.get(1.0, tk.END).split("\n")  # split on newlines
@@ -158,7 +164,7 @@ class UI(tk.Tk):
             for command in commands:
                 if command is not None and self.job_running:
                     response = self.cnc.send_gcode(command, verbose)
-                    
+
         stream_thread: threading.Thread = threading.Thread(target=stream)
         self.jobs.append(stream_thread)
         stream_thread.start()
