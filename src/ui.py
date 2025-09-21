@@ -35,7 +35,7 @@ class UI(tk.Tk):
         self.job_running: bool = False
         self.jobs: list[threading.Thread] = []
         self.serial_port: str = ""
-        self.baud_rate: int = 115200    # 115200 is for GRBL / lazers
+        self.baud_rate: int = 500000    # 115200 is for GRBL / lazers / P3, 500000 is for Vision Pro
         self.cnc = None
         self.gcode_path: str = ""
         self.status: str = "Welcome to grapefruit! To connect a machine, select Machine > Connect to <your machine>, and load some some G-code from File > Open!"
