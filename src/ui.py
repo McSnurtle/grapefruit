@@ -157,9 +157,8 @@ class UI(tk.Tk):
         def stream():
             for command in commands:
                 if command is not None and self.job_running:
-                    response = self.cnc.send_gcode(command)
-                    if verbose: print(f"[Grapefruit] Running G-code: `{command}`."); print(f"[Grapefruit] Got response: `{response}`.")
-
+                    response = self.cnc.send_gcode(command, verbose)
+                    
         stream_thread: threading.Thread = threading.Thread(target=stream)
         self.jobs.append(stream_thread)
         stream_thread.start()
