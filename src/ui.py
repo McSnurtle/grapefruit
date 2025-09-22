@@ -35,13 +35,15 @@ class UI(tk.Tk):
         self.job_running: bool = False
         self.jobs: list[threading.Thread] = []
         self.serial_port: str = ""
-        self.baud_rate: int = 500000    # 115200 is for GRBL / lazers / P3, 500000 is for Vision Pro
+        self.baud_rate: int = 500000  # 115200 is for GRBL / lazers / P3, 500000 is for Vision Pro
         self.cnc = None
         self.gcode_path: str = ""
         self.status: str = "Welcome to grapefruit! To connect a machine, select Machine > Connect to <your machine>, and load some some G-code from File > Open!"
 
         if not len(get_machines()) > 0:
-            messagebox.showwarning("No Machines Found!", "No valid CNC machines were found over COM ports. Please ensure it is on and plugged in properly.")
+            messagebox.showwarning("No Machines Found!",
+                                   "No valid CNC machines were found over COM ports. Please ensure it is on and plugged in properly.\n\n"
+                                   "If your CNC's COM port is listed in the Console, but not in the Machine menu, it may require restarting.")
 
         # layout
         self._construct_menus()
@@ -54,7 +56,7 @@ class UI(tk.Tk):
 
         # TODO: move the following gcode section to it's own self._construct_gcode() method. It's cluttering up __init__()!
 
-        gcode_tabs = ttk.Notebook(self, width=WIDTH//2, height=HEIGHT//3)
+        gcode_tabs = ttk.Notebook(self, width=WIDTH // 2, height=HEIGHT // 3)
 
         mdi_frame: tk.Frame = tk.Frame(gcode_tabs)
         gcode_tabs.add(mdi_frame, text="MDI")
@@ -70,7 +72,6 @@ class UI(tk.Tk):
         mdi_scrollbar.pack(side="right", fill="y", expand=True)
         self.mdi_input["yscrollcommand"] = mdi_scrollbar.set  # widget.yscrollcommand is a PyRight error apparently
         self.mdi_input.pack(fill="both", expand=True)
-
 
         gcode_frame: tk.Frame = tk.Frame(gcode_tabs)
         gcode_tabs.add(gcode_frame, text="G-code")
@@ -102,7 +103,8 @@ class UI(tk.Tk):
         machine_menu = tk.Menu(menubar, tearoff=False)
         menubar.add_cascade(label="Machine", menu=machine_menu)
         for machine in get_machines():
-            machine_menu.add_command(label=f"Connect to {machine["desc"]} ({machine["port"]}", command=lambda: self._connect_to_machine(machine["port"]))
+            machine_menu.add_command(label=f"Connect to {machine["desc"]} ({machine["port"]}",
+                                     command=lambda: self._connect_to_machine(machine["port"]))
 
         self.configure(menu=menubar)
 
@@ -113,9 +115,9 @@ class UI(tk.Tk):
             self.cnc.connect()
         except serial.SerialException as e:
             messagebox.showwarning("Error Connecting to Machine!",
-                                  f"There was an error while initiating the connection to your machine '{self.serial_port}'.\n" \
-                                  "This is likely due to a conflicting permissions error - are you sure you don't have any other CNC software running?\n" \
-                                  "Error stack trace:\n\n{e}")
+                                   f"There was an error while initiating the connection to your machine '{self.serial_port}'.\n"
+                                   "This is likely due to a conflicting permissions error - are you sure you don't have any other CNC software running?\n"
+                                   "Error stack trace:\n\n{e}")
 
     def _run_mdi(self, verbose: bool = True) -> None:
         commands = self.mdi_input.get(1.0, tk.END).split("\n")  # split on newlines
@@ -149,7 +151,7 @@ class UI(tk.Tk):
             commands: Iterable[str] = fp.readlines()
         self.show_status(f"Loading G-code from {gcode_path}")
         self.gcode_input.configure(state="normal")
-        [self.gcode_input.insert(float(index+1), command) for index, command in enumerate(commands)]
+        [self.gcode_input.insert(float(index + 1), command) for index, command in enumerate(commands)]
         self.gcode_input.configure(state="disabled")
 
         if verbose: print(
