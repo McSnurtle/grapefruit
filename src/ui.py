@@ -209,7 +209,7 @@ class UI(tk.Tk):
         self.job_running = False
         self.show_status("Closing...")
         self._stop_jobs()
-        self.cnc.terminate()
+        if self.cnc is not None: self.cnc.terminate()
         self.destroy()
         sys.exit(exit_code)
 
