@@ -1,5 +1,5 @@
 """A connection helper through serial module to any and all connected CNC machines."""
-# imports - connector.py, by Mc_Snurtle
+# imports - grbl.py, by Mc_Snurtle
 import time
 from typing import Any, Union
 
@@ -7,7 +7,6 @@ import serial
 from serial.tools import list_ports
 
 # ========== Variables ==========
-command_interval: Union[int, float] = 0.05  # in seconds
 timeout: int = 1    # also in seconds
 # feed rates
 rapid_rate: int = 100
@@ -16,17 +15,18 @@ move_rate: int = 25
 
 
 # ========== Classes ==========
-class CNC:
+class Connector:
     def __init__(self, serial_port: str, baud_rate: int):
         self.serial_port: str = serial_port
         self.baud_rate: int = baud_rate
         self.connector = None
 
-    def connect(self) -> bool:
+    def connect(self) -> Union[str, None]:
         """Performs the initial connection to the CNC over serial, returning its success.
 
         Returns:
-            :returns: (bool), whether a connection was successfully established with the CNC.
+            :returns: (Union[str, None]) the response from the handshake attempt.
+            :rtype: Union[str, None]
         Raises:
             :raises serial.SerialException: if there was a Permission Error whilst connecting to the CNC."""
         try:
@@ -36,90 +36,51 @@ class CNC:
             startup_data = ""
             
             # Read all available lines sent by device on connect
-            while True:
-                if self.connector.in_waiting:
-                    line = self.connector.readline().decode("utf-8", errors="replace").strip()
-                    if line:
-                        print(f"[CNC] Startup message line: '{line}'")
-                        startup_data += line + "\n"
-                    else:
-                        # Empty line, just continue reading
-                        continue
-                else:
-                    # No more data waiting to read, break loop
-                    break
-            
-            print(f"[CNC] Full startup message from device:\n{startup_data.strip()}")
-
+            if self.connector.in_waiting:
+                print(f"[CNC] Full startup message from device:\n{startup_data.strip()}")
 
             self.connector.flush()  # wait for all communications to finish
-            self.handshake()
+            response = self.handshake()
             self.connector.flush()  # wait for all communications to finish
             print(f"[CNC] Connection established with {self.serial_port}")
+            return response
         except serial.SerialException as e:
             print(f"[CNC] There was an error whilst attempting first-time connection to the CNC '{self.serial_port}'. ({e})")
             raise serial.SerialException(e)
-            return False
-        return True
 
-    def handshake(self):
-        self.send_gcode("M105")
+    def handshake(self) -> Union[str, None]:
+        """Sends a handshake to initalize a connection with the CNC.
+        
+        Returns:
+            :returns: the response to the handshake attempt from the CNC
+            :rtype: Union[str, None]"""
+        
+        return self.send_gcode("$I")
 
-    def send_gcode(self, command: str, verbose: bool = True, run_anyway: bool = False) -> Any:
+    def send_gcode(self, command: str, verbose: bool = True, run_anyway: bool = False) -> Union[str, None]:
         """Streams G-code to connected machine over the serial port. Returns the machine's response.
         WARNING: This function is blocking, and may take time to receive a response from the machine.
 
         Params:
-            :param command: the G-code command to send.
+            :param command: (str), the G-code command to send.
             :type command: str
             :param verbose: (bool), whether to print the CNC's response.
             :type verbose: bool
-            :param run_anyway: whether to ignore parsing & sanitization and run as raw G-code, otherwise, comments and blank lines are removed.
+            :param run_anyway: (bool), whether to ignore parsing & sanitization and run as raw G-code, otherwise, comments and blank lines are removed.
             :type run_anyway: bool
         Returns:
             :returns: the response given from the machine after `command` was run. String if command was sent, and Nonetype if the command was invalid (is comment, etc).
             :rtype: Union[str, None]"""
 
-        if not run_anyway: command = self._parse_command(command)
+        if not run_anyway: command = parse_command(command)
 
         try:
             if (command is not None and command != "") or run_anyway:
-                if verbose: print(f"[CNC] Sending G-code: `{command}`.")
                 self.connector.write((command.strip() + "\r\n").encode("utf-8"))
-
-                time.sleep(command_interval)
-
                 response: Any = self.connector.readline().decode("utf-8").strip()  # This requires the connected machine to terminate ALL responses with an EOL!
-
-                if verbose: print(f"[CNC] Got response: `{response}`")
                 return response
-            else:
-                if verbose: print(f"[CNC] Skipping command '{command}'")
         except serial.SerialException as e:
             print(f"[CNC] An unexpected error occured whilst sending G-code to CNC '{self.serial_port}'. See traceback for more. ({e})")
-
-        return None
-
-    def _parse_command(self, command: str) -> Union[str, None]:
-        """Strips the given command of all comments, and returns only the valid G-code (if any).
-
-        Params:
-            :param command: the G-code command provided to be parsed.
-            :type command: str
-        Returns:
-            :returns: parsed command, if is entirely comment, returns None.
-            :rtype: Union[str, None]"""
-
-        command = command.strip()
-        if not (
-                command.startswith(":")
-                or command.startswith("/")
-                or command.startswith("(")
-                ) and command != "":    # if not a comment only, and not empty space
-            for comment in [":", "/", "("]: # for all possible comments...
-                if comment in command:
-                    comment = comment.split(comment, 1)[0]  # remove the comment part of the command
-            return command
 
         return None
 
@@ -160,16 +121,43 @@ class CNC:
 
 
 # ========== Functions ==========
-def get_machines() -> list[dict[str, str]]:
+def get_machines(show_all: bool = False) -> list[dict[str, str]]:
     """Returns a list of all COM ports through PySerial.
 
+    Params:
+        :param show_all: whether to show all available COM ports, unfiltered. Otherwise only shows "known" ports (with descriptions).
+        :type show_all: bool
     Returns:
         :returns: (list[dict[str, str]]), for example, the return might look like: `[{"port": "COM1", "desc": "A thingy.", "hwid": "ACPI\\PNP0501\\1"}]`."""
     ports = list_ports.comports()
     results: list[dict[str, str]] = []
 
     for port, desc, hwid in sorted(ports):
-        if desc != "n/a":   # filter to only known ports
+        if desc != "n/a" or show_all:   # filter to only known ports
             results.append({"port": port, "desc": desc, "hwid": hwid})
 
     return results
+
+
+def parse_command(command: str) -> Union[str, None]:
+    """Strips the given command of all comments, and returns only the valid G-code (if any).
+
+    Params:
+        :param command: the G-code command provided to be parsed.
+        :type command: str
+    Returns:
+        :returns: parsed command, if is entirely comment, returns None.
+        :rtype: Union[str, None]"""
+
+    command = command.strip()
+    if not (
+            command.startswith(":")
+            or command.startswith("/")
+            or command.startswith("(")
+            ) and command != "":    # if not a comment only, and not empty space
+        for comment in [":", "/", "("]: # for all possible comments...
+            if comment in command:
+                command = command.split(comment, 1)[0]  # remove the comment part of the command
+        return command
+
+    return None
