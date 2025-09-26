@@ -10,7 +10,7 @@ from typing import (Any, Iterable, Union)
 import serial
 
 from utils.path import (get_home, gcode_filetypes)
-from src.utils.grbl import (Connector, get_machines, parse_command)
+from utils.grbl import (Connector, get_machines, parse_command)
 
 # ========== Constants ==========
 WIDTH: int = 800
@@ -145,7 +145,7 @@ class UI(tk.Tk):
             messagebox.showwarning("Error Connecting to Machine!",
                                    f"There was an error while initiating the connection to your machine '{self.serial_port}'.\n"
                                    "This is likely due to a conflicting permissions error - are you sure you don't have any other CNC software running?\n"
-                                   "Error stack trace:\n\n{e}")
+                                   f"Error stack trace:\n\n{e}")
 
     def _run_mdi(self, verbose: bool = True) -> None:
         commands = self.mdi_input.get(1.0, tk.END).split("\n")  # split on newlines
