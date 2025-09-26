@@ -3,18 +3,18 @@ import os
 import sys
 import threading
 import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor
 from tkinter import (ttk, filedialog, messagebox)
-from typing import (Iterable, Union)
+from typing import (Any, Iterable, Union)
 
 import serial
 
 from utils.path import (get_home, gcode_filetypes)
-from utils.connector import (CNC, get_machines)
+from src.utils.grbl import (Connector, get_machines, parse_command)
 
 # ========== Constants ==========
 WIDTH: int = 800
 HEIGHT: int = 600
-command_interval: int = 1  # in seconds # TODO: move this and it's references across all scripts to the new gcode module as mentioned in issue #1
 
 # ========== Variables ==========
 __author__: str = "Mc_Snurtle"
@@ -35,7 +35,7 @@ class UI(tk.Tk):
         self.job_running: bool = False
         self.jobs: list[threading.Thread] = []
         self.serial_port: str = ""
-        self.baud_rate: int = 500000  # 115200 is for GRBL / lazers / P3, 500000 is for Vision Pro
+        self.baud_rate: int = 500_000  # 115,200 is for GRBL / lazers / P3, 500,000 is for Vision Pro
         self.cnc = None
         self.gcode_path: str = ""
         self.status: str = "Welcome to grapefruit! To connect a machine, select Machine > Connect to <your machine>, and load some some G-code from File > Open!"
@@ -54,8 +54,33 @@ class UI(tk.Tk):
                              pady=1)  # couldn't supress PyCharm warnings about Literals
         status_frame.pack(side="bottom", anchor="sw", fill="x")
 
-        # TODO: move the following gcode section to it's own self._construct_gcode() method. It's cluttering up __init__()!
+        self._construct_gcode_frame()
+        self._construct_console_frame()
 
+    def _construct_console_frame(self):
+        """Initiate Console frame"""
+        console_frame = tk.Frame(self)
+
+        def send_command(command: str) -> None:
+            if self.cnc is not None:
+                console_entry.delete(0, tk.END)
+                self._stream_gcode([command], verbose=True)
+            else:
+                messagebox.showerror("Error", "Your command will be ignored since no CNC is connected.\n\n"
+                                              "To connect one, select your CNC from the Machine dropdown.")
+
+        console_label = tk.Label(console_frame, text="Console", justify="left", anchor="nw")
+        console_label.pack(side="top", fill="x")
+        self.console_text = tk.Listbox(console_frame, state="normal", width=45, height=20, selectmode=tk.MULTIPLE)
+        self.console_text.pack(side="top", pady=5, fill="x")
+        console_entry = tk.Entry(console_frame)
+        console_entry.pack(side="bottom", fill="x")
+        console_entry.bind("<Return>", lambda e: send_command(console_entry.get()))
+
+        console_frame.pack(side="right", anchor="ne", padx=10, pady=10)
+
+    def _construct_gcode_frame(self):
+        """Initiate G-code operations frame"""
         gcode_tabs = ttk.Notebook(self, width=WIDTH // 2, height=HEIGHT // 3)
 
         mdi_frame: tk.Frame = tk.Frame(gcode_tabs)
@@ -88,7 +113,7 @@ class UI(tk.Tk):
         self.gcode_input["yscrollcommand"] = gcode_scrollbar.set
         self.gcode_input.pack(fill="both", expand=True)
 
-        gcode_tabs.pack(side="left")
+        gcode_tabs.pack(side="left", anchor="nw")
 
     def _construct_menus(self):
         """Instantiate the menus"""
@@ -110,9 +135,12 @@ class UI(tk.Tk):
 
     def _connect_to_machine(self, serial_port: str) -> None:
         self.serial_port = serial_port
-        self.cnc = CNC(serial_port=self.serial_port, baud_rate=self.baud_rate)
+        self.cnc = Connector(serial_port=self.serial_port, baud_rate=self.baud_rate)
         try:
-            self.cnc.connect()
+            # TODO: make an actual robust, globally accessible logging system that logs to THE UI CONSOLE!
+            # aka stop fudging this "yo look at how I definitely just sent this $I command trust me bro"
+            self._log("Grapefruit", "$I")
+            self._log("CNC", self.cnc.connect())
         except serial.SerialException as e:
             messagebox.showwarning("Error Connecting to Machine!",
                                    f"There was an error while initiating the connection to your machine '{self.serial_port}'.\n"
@@ -137,12 +165,11 @@ class UI(tk.Tk):
             self.job_running = False
             [job.join() for job in self.jobs]
 
-    def _load_gcode(self, path: Union[str, None] = None, verbose: bool = False) -> Iterable[str]:
+    def _load_gcode(self, path: Union[str, None] = None) -> Iterable[str]:
         """Loads G-code based on the given absolute filepath.
 
         Params:
             :param path: (Union[str, None]), the absolute path to the G-code file (.txt, .nc, .tap) or None. Defaults to `self.gcode_path`.
-            :param verbose: (bool), whether to print the **entire log of the G-code**. WARNING: CAN GET VERY MESSY.
         Returns:
             :returns: (Iterable[str]), the list of lines of commands found within the specified file."""
 
@@ -154,9 +181,6 @@ class UI(tk.Tk):
         [self.gcode_input.insert(float(index + 1), command) for index, command in enumerate(commands)]
         self.gcode_input.configure(state="disabled")
 
-        if verbose: print(
-            "".join(commands))  # don't add \n since .readlines() already parses that out from text documents.
-
         return commands
 
     def _stream_gcode(self, commands: Iterable[str], verbose: bool = True) -> None:
@@ -164,24 +188,40 @@ class UI(tk.Tk):
 
         self.job_running = True
 
-        def stream():
-            for command in commands:
-                if command is not None and self.job_running:
-                    response = self.cnc.send_gcode(command, verbose)
+        def communicate(message: str) -> Union[str, None]:
+            return self.cnc.send_gcode(message)
 
-        stream_thread: threading.Thread = threading.Thread(target=stream)
-        self.jobs.append(stream_thread)
-        stream_thread.start()
+        for command in commands:
+            command = parse_command(command)
+            if command is not None:
+                self._log("Grapefruit", command, stdout=verbose)
+                with ThreadPoolExecutor() as executor:
+                    future = executor.submit(communicate, command)
+                    result: Union[str, None] = future.result()
+                self._log("CNC", result, stdout=verbose)
 
     def _get_and_load_gcode(self):
-        self._load_gcode(self.show_open_file_dialog(), verbose=False)
+        self._load_gcode(self.show_open_file_dialog())
 
-    def _log(self, prefix: str = "Grapefruit", message: str = "", stdout: bool = True) -> None:
-        # TODO: make this log to a widget on the UI somewhere.
+    def _log(self, prefix: str = "Grapefruit", message: str = "", stdout: bool = True) -> str:
+        """Logs the message with a prefix to determine its origin to the UI console.
+
+        Params:
+            :param prefix: (str), the prefix to add to the message. Defaults to Grapefruit.
+            :param message: (str), the message to log. Defaults to "".
+            :param stdout: (bool), whether to print the output to the terminal's console as well as the UI console.
+        Returns:
+            :returns: (str), the raw message provided.
+            :rtype: str"""
+
         output: str = f"[{prefix}] {message}"
-        self.show_status(output)
+
+        self.console_text.insert(tk.END, output)
+
         if stdout:
             print(output)
+
+        return message
 
     def show_status(self, message: str) -> None:
         """Updates the status bar at the bottom of the UI with `message`.
