@@ -201,7 +201,9 @@ class UI(tk.Tk):
                 self._log("CNC", result, stdout=verbose)
 
     def _get_and_load_gcode(self):
-        self._load_gcode(self.show_open_file_dialog())
+        fp: Union[str, None] = self.show_open_file_dialog()
+        if isinstance(fp, str):
+            self._load_gcode(fp)
 
     def _log(self, prefix: str = "Grapefruit", message: str = "", stdout: bool = True) -> str:
         """Logs the message with a prefix to determine its origin to the UI console.
