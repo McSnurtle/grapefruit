@@ -244,7 +244,7 @@ class UI(tk.Tk):
             :rtype: Union[str, None]"""
 
         choice: Any = filedialog.askopenfilename(initialdir=get_home(), filetypes=gcode_filetypes)
-        if choice:
+        if isinstance(choice, str) and choice != "" and choice is not None:
             path: str = os.abspath(choice)
             print(f"[Grapefruit] Retrieved path '{path}' from user.")
             self.gcode_path = path
