@@ -35,7 +35,7 @@ class UI(tk.Tk):
         self.job_running: bool = False
         self.jobs: list[threading.Thread] = []
         self.serial_port: str = ""
-        self.baud_rate: int = 500_000  # 115,200 is for GRBL / lazers / P3, 500,000 is for Vision Pro
+        self.baud_rate: int = 115_200  # 115,200 is for GRBL / lazers / P3, 500,000 is for Vision Pro
         self.cnc = None
         self.gcode_path: str = ""
         self.status: str = "Welcome to grapefruit! To connect a machine, select Machine > Connect to <your machine>, and load some some G-code from File > Open!"
@@ -236,11 +236,19 @@ class UI(tk.Tk):
         self.status_bar.configure(text=self.status)
         self.status_bar.update()
 
-    def show_open_file_dialog(self) -> str:
-        path: str = os.path.abspath(filedialog.askopenfilename(initialdir=get_home(), filetypes=gcode_filetypes))
-        print(f"[Grapefruit] Retrieved path '{path}' from user.")
-        self.gcode_path = path
-        return path
+    def show_open_file_dialog(self) -> Union[str, None]:
+        """Use tkinter filedialog.askopenfilename to prompt and get a gcode file path from the user.
+
+        Returns:
+            :returns: (Union[str, None]), the path provided by the user unless cancelled.
+            :rtype: Union[str, None]"""
+
+        choice: Any = filedialog.askopenfilename(initialdir=get_home(), filetypes=gcode_filetypes)
+        if choice:
+            path: str = os.abspath(choice)
+            print(f"[Grapefruit] Retrieved path '{path}' from user.")
+            self.gcode_path = path
+            return path
 
     def terminate(self, exit_code: int = 0) -> None:
         """Safely closes down the UI.
